@@ -10,9 +10,12 @@ from iteration_1_python import *
 # Sidebar for API key input and relevant links
 with st.sidebar:
     openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    st.session_state["openai_api_key"] = openai_api_key
-    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2, api_key=st.session_state["openai_api_key"])    
-    summarizer = load_summarize_chain(llm, chain_type="stuff")
+    if openai_api_key:  # Check if the API key is entered
+        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2, api_key=openai_api_key)
+        summarizer = load_summarize_chain(llm, chain_type="stuff")
+    else:
+        st.error("Please enter the OpenAI API key.")
+
     session_id = st.text_input("Session ID", key="session_id")
     uploaded_files = st.file_uploader("Choose a folder and upload files", accept_multiple_files=True, type=['txt', 'csv', 'png', 'jpg', 'pdf'])
 
