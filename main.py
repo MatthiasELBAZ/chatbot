@@ -6,7 +6,7 @@ import tempfile
 import os
 from iteration_1_python import *
 
-
+openai_api_key = None
 
 # Sidebar for API key input and relevant links
 with st.sidebar:
