@@ -60,7 +60,7 @@ if st.button("Make Summary"):
 
 if st.button("Set Conversational Rag Chain"):
     if history_path_input:
-        time_retriever = create_time_weighted_vector_store_retriever(history_path_input)
+        time_retriever = create_time_weighted_vector_store_retriever(history_path_input, openai_api_key)
         rag_chain = create_rag_chain(llm, time_retriever)
         conversational_rag_chain = create_conversational_rag_chain(rag_chain)
         st.session_state['conversational_rag_chain'] = conversational_rag_chain
