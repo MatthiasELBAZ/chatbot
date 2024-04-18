@@ -223,7 +223,7 @@ def summary_chat_history(llm, history_store):
         ]
     )
     summarization_chain = summarization_prompt | llm
-    new_journal_message = summarization_chain.invoke({"chat_history": store['foo'].messages}).content
+    new_journal_message = summarization_chain.invoke({"chat_history": history_store['foo'].messages}).content
     return new_journal_message
 
 # def function to update the journal
