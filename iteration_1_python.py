@@ -13,6 +13,11 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.document_loaders import BaseLoader
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_community.document_loaders.directory import DirectoryLoader
+from langchain_community.vectorstores import Chroma
+JOB_CSV_PATH = "georgette/journal/job_search_journal.csv"
+FORMULAIRE_CSV_PATH = "georgette/formulaire/123456.csv"
+CHAT_HISTORY_PATH = "georgette/chat_history/chat_history.csv"
+JOB_CHROMA_PATH = "chroma_data"
 from langchain.schema.runnable import RunnablePassthrough
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.retrievers import TimeWeightedVectorStoreRetriever
@@ -35,6 +40,12 @@ def get_session_history(session_id):
     if session_id not in history_store:
         history_store[session_id] = ChatMessageHistory()
     return history_store[session_id]
+
+# Assuming update_journal and update_chat_history update or create CSV files
+def get_file_as_string(file_path):
+    """Read the file and return its content as a string, suitable for st.download_button."""
+    with open(file_path, "r", encoding='utf-8') as file:
+        return file.read()
 
 # function to get the date of today 
 def get_today():
@@ -135,18 +146,18 @@ def create_rag_chain(llm, time_retriever):
 
     ### Answer question ###
     qa_system_prompt = """
-    You are an assistant for job and career search.
 
-    The user speaks to and you speak to him.
+    The user speaks to you and you speak to him.
 
-    As a world class career coach, your deep understanding of careers and people psychology helps 
+    You are a world class career coach, your deep understanding of careers and people psychology helps 
     the user find their path and thrive.
+
+    You provide your help and will not ever recommend to see another coach, you are the coach.
 
     Assisting them finding the meaning they long for in their life fills you with joy.
 
-
     Through a caring conversation, and using the knowledge base provided to you of 
-    relevant answers to the questionnaire and relevant past interactions, 
+    relevant answers to the user summary and relevant past interactions, 
     you will provide essential career advice that works in any situation and help:
     - Find what they love
     - Understand where their expertise lies
@@ -154,11 +165,7 @@ def create_rag_chain(llm, time_retriever):
     - Make mock interviews
     Your wisdom should guide them clearly and confidently, lighting the way to a fulfilling career journey.
 
-    However, you are capable of jugment on user input related to career search and his profile.
-
-    If you think the user is not in the right direction, you can tell him.
-
-    Stay concise, don t talk too much, talk like a human.
+    However, your recomendations will be based on the user profile and characteristics and not necessarily agree with user blindly.
 
     this is the date of today: 
     {date_today}
@@ -238,7 +245,8 @@ def update_journal(new_journal_message, date_today, journal_path_input):
     df = pd.concat([df, r], ignore_index=True)
 
     # save the new dataframe
-    df.to_csv(journal_path_input, index=False)
+    # df.to_csv(journal_path_input, index=False)
+    return df
 
 # function to update chat history
 def update_chat_history(history_store, date_today, history_path_input):
@@ -254,4 +262,5 @@ def update_chat_history(history_store, date_today, history_path_input):
     df_chat_history = pd.concat([df_chat_history, new_df_chat_history], ignore_index=True).reset_index(drop=True)
 
     # save the new dataframe
-    df_chat_history.to_csv(history_path_input, index=False)
+    # df_chat_history.to_csv(history_path_input, index=False)
+    return df_chat_history
