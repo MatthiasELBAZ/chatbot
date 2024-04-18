@@ -13,12 +13,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.document_loaders import BaseLoader
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_community.document_loaders.directory import DirectoryLoader
-from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
-JOB_CSV_PATH = "georgette/journal/job_search_journal.csv"
-FORMULAIRE_CSV_PATH = "georgette/formulaire/123456.csv"
-CHAT_HISTORY_PATH = "georgette/chat_history/chat_history.csv"
-JOB_CHROMA_PATH = "chroma_data"
 from langchain.schema.runnable import RunnablePassthrough
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.retrievers import TimeWeightedVectorStoreRetriever
@@ -94,12 +88,12 @@ def modify_user_summary_with_journal(user_summary, journal_summary, llm):
     return new_user_summary
 
 # function that create time weighted vector store retriever on history
-def create_time_weighted_vector_store_retriever(history_path_input):
+def create_time_weighted_vector_store_retriever(history_path_input, openai_api_key):
     # history_loader = DirectoryLoader(history_path_input, glob="*.csv", loader_cls=CSVLoader)
     history_loader = CSVLoader(history_path_input)
     history_docs = history_loader.load()
     faiss_index = faiss.IndexFlatL2(1536)
-    faiss_vectorstore = FAISS(OpenAIEmbeddings(), faiss_index, InMemoryDocstore({}), {})
+    faiss_vectorstore = FAISS(OpenAIEmbeddings(openai_api_key=openai_api_key), faiss_index, InMemoryDocstore({}), {})
     time_retriever = TimeWeightedVectorStoreRetriever(
         vectorstore=faiss_vectorstore, 
         decay_rate=1e-10, 
