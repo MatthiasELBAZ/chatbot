@@ -79,7 +79,7 @@ if st.button('End Chat'):
     if 'messages' in st.session_state:
         new_journal_message = summary_chat_history(llm, history_store)
         update_journal(new_journal_message, date_today, journal_path_input)
-        update_chat_history(history_store, date_today)
+        update_chat_history(history_store, date_today, history_path_input)
         st.session_state['messages'] = []
 
 # Chat interaction
