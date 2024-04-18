@@ -1,4 +1,4 @@
-faiss
+faiss-cpu
 langchain
 langchain-community
 langchain-hub
