@@ -239,7 +239,7 @@ def update_journal(new_journal_message, date_today, journal_path_input):
     df.to_csv(journal_path_input, index=False)
 
 # function to update chat history
-def update_chat_history(history_store, date_today):
+def update_chat_history(history_store, date_today, history_path_input):
     # new chat history
     new_df_chat_history = pd.DataFrame(history_store['foo'].dict()['messages'])
     new_df_chat_history['date'] = date_today
