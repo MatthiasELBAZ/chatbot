@@ -1,7 +1,6 @@
 import streamlit as st
 import datetime
 import pandas as pd
-import faiss
 from pathlib import Path
 import tempfile
 import os
