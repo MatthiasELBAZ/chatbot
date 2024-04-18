@@ -1,0 +1,6 @@
+faiss
+langchain
+langchain-community
+langchain-hub
+langchain-core
+langchain-experimental
