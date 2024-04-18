@@ -158,6 +158,8 @@ def create_rag_chain(llm, time_retriever):
 
     If you think the user is not in the right direction, you can tell him.
 
+    Stay concise, don t talk too much, talk like a human.
+
     this is the date of today: 
     {date_today}
 
