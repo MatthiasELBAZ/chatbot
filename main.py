@@ -6,11 +6,12 @@ import tempfile
 import os
 from iteration_1_python import *
 
-openai_api_key = None
 
 # Sidebar for API key input and relevant links
 with st.sidebar:
     openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
+    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2, api_key=openai_api_key)
+    summarizer = load_summarize_chain(llm, chain_type="stuff")
     session_id = st.text_input("Session ID", key="session_id")
     uploaded_files = st.file_uploader("Choose a folder and upload files", accept_multiple_files=True, type=['txt', 'csv', 'png', 'jpg', 'pdf'])
 
@@ -37,11 +38,11 @@ for uploaded_file in uploaded_files:
     elif 'history.csv' in uploaded_file.name:
         history_path_input = os.path.join(temp_dir, uploaded_file.name)
 
-# Setup your LLM and other components
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2, api_key=openai_api_key)
-summarizer = load_summarize_chain(llm, chain_type="stuff")
+
+
 new_user_summary = None
 conversational_rag_chain = None
+
 
 # Implement the button functionalities
 date_today = get_today()
