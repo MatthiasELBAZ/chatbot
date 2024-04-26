@@ -21,12 +21,12 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import FewShotChatMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.document_loaders import BaseLoader
-from langchain_core.runnables.history import RunnableWithMessageHistory , RunnableBranch
+from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.documents import Document
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_anthropic import ChatAnthropic, AnthropicEmbeddings
-from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_anthropic import ChatAnthropic
+from langchain_mistralai import ChatMistralAI
 
 from langchain_pinecone import PineconeVectorStore
 
@@ -87,7 +87,7 @@ def load_csv_from_directory(directory):
         return docs
 
 
-    loader = DirectoryLoader(directory, glob="*.csv", loader_cls=CSVLoader)
+    loader = DirectoryLoader(directory, glob=".csv", loader_cls=CSVLoader)
     docs = loader.load()
     docs = add_date_to_documents(docs)    
     return docs
@@ -246,17 +246,22 @@ def pinecone_time_retriever(embedding, index_name):
         k=5
     )
 
+    for i, doc in enumerate(journal_docs):
+        page_content = doc.page_content
+        metadata = doc.metadata
+        faiss_time_retriever.add_documents([Document(page_content=page_content, metadata=metadata)])
+
     return pinecone_time_retriever
 
 
 # function for chatbot
-store_history = {
-        session_id:
-        {
-            "ongo":ChatMessageHistory(), 
-            "full":ChatMessageHistory()
-        }
-    }
+# store_history = {
+#         session_id:
+#         {
+#             "ongo":ChatMessageHistory(), 
+#             "full":ChatMessageHistory()
+#         }
+#     }
 
 
 def get_document_chain(llm):
@@ -329,7 +334,7 @@ def get_document_chain_with_message_history(document_chain, store_history):
     return document_chain_with_message_history
 
 
-def get_retrieval_document_chain_with_message_history(document_chain_with_message_history, pinecone_time_retriever, llm, store_history):
+def get_retrieval_document_chain_with_message_history(document_chain_with_message_history, time_retriever, llm, store_history):
     def summarize_messages(chain_input):
         stored_messages = store_history[session_id]['ongo'].messages
         if len(stored_messages) == 0:
@@ -369,7 +374,7 @@ def get_retrieval_document_chain_with_message_history(document_chain_with_messag
     retrieval_document_chain_with_message_history = (
         RunnablePassthrough.assign(
             messages_summarized=summarize_messages, 
-            context=parse_retriever_input | pinecone_time_retriever).assign(
+            context=parse_retriever_input | time_retriever).assign(
                 answer=document_chain_with_message_history)
     )
 
@@ -433,7 +438,7 @@ def update_store_journal(journal_csv_path, pinecone_time_retriever, new_journal)
     pinecone_time_retriever.add_documents([Document(page_content=new_journal.content, metadata=metadata)])
 
 
-def update_store_chat_history(chat_history_csv_path, store_history)
+def update_store_chat_history(chat_history_csv_path, store_history):
     # new chat history
     new_df_chat_history = pd.DataFrame(store_history[session_id]['full'].dict()['messages'])
     new_df_chat_history['date'] = date_today
@@ -444,5 +449,4 @@ def update_store_chat_history(chat_history_csv_path, store_history)
     df_chat_history = pd.concat([df_chat_history, new_df_chat_history], ignore_index=True).reset_index(drop=True)
     # save the new dataframe
     df_chat_history.to_csv(chat_history_csv_path, index=False)
-
 
