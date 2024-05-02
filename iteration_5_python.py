@@ -524,7 +524,7 @@ class UpdateStore():
 
 def main():
 
-    user_directory = 'georgette_2/'
+    user_directory = input('user data folder: ')
 
     # user definition - existance verification needed
     user_id = "0"
