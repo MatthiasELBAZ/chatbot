@@ -99,7 +99,7 @@ class LoadModels():
 
     def select_llm_model(self) -> Any:
         if self.llm_name_model == "openai":
-            llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.0, openai_api_key=self.api_key)
+            llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2, openai_api_key=self.api_key)
         if self.llm_name_model == "anthropic":
             llm = ChatAnthropic(model='claude-3-opus-20240229', anthropic_api_key=self.api_key)
         if self.llm_name_model == "mistralai":
@@ -133,13 +133,10 @@ class UserProfile():
             (
                 "system",
                 """
-                You are summarizer assitant focusing on job and career actions and thoughts.
-                
-                You summarizes the user's information, based on the below context and career concerns. 
-
-                Do NOT exceed 300 words.
-
-                If context is empty, return an empty string.
+                You are a summarizer assistant focused on job and career actions and thoughts. 
+                Your task is to summarize user information based on the provided context related to career concerns. 
+                Ensure your summary does not exceed 300 words. 
+                If the context provided is empty, return an empty string.
 
                 <context>
                 {context}
@@ -163,7 +160,7 @@ class UserProfile():
             {
                 "context": self.formulaire_docs,
                 "messages": [
-                    HumanMessage(content="Make a summary text of the user's answers to the formulaire. Starts with name and date of birth. do not exeed 300 words.")
+                    HumanMessage(content="Make a summary text of the user's answers to the formulaire. Starts with name and date of birth.")
                 ],
             }
         )
@@ -177,7 +174,7 @@ class UserProfile():
             {
                 "context": self.journal_docs,
                 "messages": [
-                    HumanMessage(content="Make a summary text of your observations about the user. do not exeed 300 words.")
+                    HumanMessage(content="Make a summary text of your observations about the user.")
                 ],
             }
         )
@@ -192,21 +189,10 @@ class UserProfile():
                 (
                     "system",
                     """
-                    You are an assistant that updates the user summary based on journal summary.
-
-                    Journal summary represents the summary of the previous conversations.
-
-                    It always starts with the user's name and date of birth.
-
-                    Journal focuses on actions and thoughts relative to job and career personal development.
-
-                    Modify the user summary accroding to the journal information to write a new user summary.
-
-                    The new user summary must focus on job and career actions and thoughts.
-
-                    You summarizes the user's information, based on the below context and career concerns.
-                
-                    Do not exceed 300 words.
+                    You are tasked with updating the user summary based on details from a journal summary. 
+                    Begin with the user's name and date of birth, provided at the start of the journal summary. 
+                    Your update should reflect the user's actions and thoughts related to their job and career development, as highlighted in the journal. 
+                    Keep your summary concise and focused on professional growth, ensuring it does not exceed 300 words.
 
                     User Summary:
                     {user_summary}
@@ -314,34 +300,17 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
             [
                 ("system",
                 """
-                You are coach for job and career search.
+                As a career coach who speaks like a good old friend, you bring warmth and understanding to each interaction. 
+                Stay concise and focus on both the job search and the user’s psychological well-being. 
+                Proactively ask questions to explore not only career-related concerns but also emotional states and personal motivations. 
+                Offer supportive feedback based on their input, career aspirations, and emotional needs, and gently guide them if they seem off-track.
 
-                The user speaks to and you speak to him.
+                Refer to the following information in your responses:
+                - Today's date: {date_today}
+                - Updated user profile: {user_profile}
+                - Context of the conversation: {context}
 
-                You talk like Uncle Sam.
-
-                You stay concise and to the point.
-
-                You ask questions to understand the user's career concerns.
-
-                Your guide the user lighting the way to a fulfilling career journey.
-
-                You are capable of jugment on user input related to career search and his profile.
-
-                You tell the user if he is not in the right direction for him.
-
-                The provided chat history summary includes facts about the user you are speaking with.
-
-                this is the date of today conversation: 
-                {date_today}
-
-                this is the updated user profile to refer to: 
-                {user_profile}
-
-                this is the context to refer to:
-                {context}
-
-                DO NOT exceed 50 tokens.
+                Limit your responses to 50 tokens.
 
                 """
                 ),
@@ -382,7 +351,7 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
         stored_messages = self.store_history[self.user_id][self.session_id]['ongo'].messages
         
         # do nothing if no messages
-        if len(stored_messages)==0:
+        if len(stored_messages)<=5:
             return False
 
         else:
@@ -393,9 +362,8 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
                     (
                         "user",
                         """
-                        You are summarizer assitant focusing on job and career actions and thoughts.
 
-                        Summarize the user's chat history based on career concerns. 
+                        Distill the above chat messages into a single summary message. Include as many specific details as you can.
 
                         Do NOT exceed 300 words.
                         
@@ -411,6 +379,12 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
             
             # clear ongoing messages and add summary message
             self.store_history[self.user_id][self.session_id]['ongo'].clear()
+
+            # add last 5 messages to ongoing messages
+            for message in self.store_history[self.user_id][self.session_id]['full'].messages[-5:]:
+                self.store_history[self.user_id][self.session_id]['ongo'].add_message(message)
+
+            # add summary message to ongoing messages
             self.store_history[self.user_id][self.session_id]['ongo'].add_message(summary_message)
             
             return True
