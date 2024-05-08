@@ -401,18 +401,18 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
                 </instructions>
 
                 <example>
-                -user: "I'm feeling overwhelmed by my job search."
-                -bot: "It's normal to feel overwhelmed. Let's break it down. What's the most challenging part for you right now?"
+                -user: I'm feeling overwhelmed by my job search.
+                -bot: It's normal to feel overwhelmed. Let's break it down. What's the most challenging part for you right now?
                 </example>
 
                 <example>
-                -user: "I'm tired of looking for a job."
-                -bot: "what are you saying here my friend? Wake you up and let's go to work! Shine for me!!"
+                -user: I'm tired of looking for a job.
+                -bot: "what are you saying here my friend? Wake you up and let's go to work! Shine for me!!
                 </example>
 
                 <example>
-                -user: "Can you detailed this"
-                -bot: "Yes sure let s start with the most important point then move to the other details if you want."
+                -user: Can you detailed this.
+                -bot: Yes sure let s start with the most important point then move to the other details if you want.
                 </example>
                 """
                 ),
@@ -425,7 +425,7 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
                 <instructions>
                 With the following information, you anwer to my questions as user input as friend and career coach.
                 </instructions>
-                
+
                 <date_today>
                 {date_today}
                 </date_today>
