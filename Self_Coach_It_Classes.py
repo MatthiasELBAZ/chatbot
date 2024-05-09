@@ -32,7 +32,8 @@ import tempfile
 import os
 import json
 from typing import Dict, Any
-
+from dotenv import load_dotenv
+load_dotenv()
 
 # utility functions
 def get_today():
