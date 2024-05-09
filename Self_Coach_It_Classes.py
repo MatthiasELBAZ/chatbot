@@ -30,13 +30,34 @@ import datetime
 from pathlib import Path
 import tempfile
 import os
+import json
 from typing import Dict, Any
-from dotenv import load_dotenv
-load_dotenv()
+
 
 # utility functions
 def get_today():
     return datetime.datetime.now()
+
+
+def read_json_file(file_name):
+    with open(file_name, 'r') as f:
+        return json.load(f)
+
+
+class SelectPrompt():
+    def __init__(self, json_file: str, coach_name: str) -> None:
+        self.json_file = json_file
+        self.coach_name = coach_name
+        self.prompt_dict = read_json_file(json_file)
+        self.system_prompt_coach = self.prompt_dict['system_prompt_coach'][coach_name]
+        self.user_prompt_coach = self.prompt_dict['user_prompt_coach'][coach_name]
+        self.journal_user_summary_system_prompt = self.prompt_dict['prompt_summary'][coach_name]['journal_user_summary_system_prompt']
+        self.user_summary_user_prompt = self.prompt_dict['prompt_summary'][coach_name]['user_summary_user_prompt']
+        self.journal_summary_user_prompt = self.prompt_dict['prompt_summary'][coach_name]['journal_summary_user_prompt']
+        self.user_profile_system_prompt = self.prompt_dict['prompt_summary'][coach_name]['user_profile_system_prompt']
+        self.user_profile_user_prompt = self.prompt_dict['prompt_summary'][coach_name]['user_profile_user_prompt']
+        self.ongo_summary_user_prompt = self.prompt_dict['prompt_summary'][coach_name]['ongo_summary_user_prompt']
+        self.full_chat_to_journal_user_prompt = self.prompt_dict['prompt_summary'][coach_name]['full_chat_to_journal_user_prompt']
 
 
 class UserSessionIdentity():
@@ -144,14 +165,16 @@ class LoadModels():
 
 
 class UserProfile():
-    def __init__(self, llm: Any, formulaire_docs: list, journal_docs: list) -> None:
+    def __init__(self, llm: Any, formulaire_docs: list, journal_docs: list, prompts: Any) -> None:
         self.llm = llm
         self.formulaire_docs = formulaire_docs
         self.journal_docs = journal_docs
+        self.prompts = prompts
         self.summarizer = None
         self.user_summary = None
         self.journal_summary = None
         self.user_profile = None
+        self.prompts = prompts
 
     def make_summarizer(self) -> None:
         # define summarizer prompt
@@ -159,18 +182,7 @@ class UserProfile():
         [
             (
                 "system",
-                """
-                <instructions>
-                You are a summarizer assistant focused on job and career actions and thoughts. 
-                Your task is to make a user profile description based on the provided context. 
-                Ensure your summary does not exceed 300 words. 
-                If the context provided is empty, return an empty string.
-                </instructions>
-
-                <context>
-                {context}
-                </context>
-                """
+                self.prompts.journal_user_summary_system_prompt
             ), 
             MessagesPlaceholder(variable_name="messages"),
         ]
@@ -189,7 +201,7 @@ class UserProfile():
             {
                 "context": self.formulaire_docs,
                 "messages": [
-                    HumanMessage(content="Make a summary text of the user's answers to the formulaire. Starts with name and date of birth and personal information then make a psychologic portrait of the user.")
+                    HumanMessage(content=self.prompts.user_summary_user_prompt)
                 ],
             }
         )
@@ -203,7 +215,7 @@ class UserProfile():
             {
                 "context": self.journal_docs,
                 "messages": [
-                    HumanMessage(content="Make a summary text of your observations about the user by emphazing the journey of the user.")
+                    HumanMessage(content=self.prompts.journal_summary_user_prompt)
                 ],
             }
         )
@@ -217,23 +229,7 @@ class UserProfile():
             [
                 (
                     "system",
-                    """
-                    <instructions>
-                    You are tasked with updating the user summary based on details from a journal summary. 
-                    Begin with the user's name and date of birth, provided at the start of the journal summary. 
-                    Your update should reflect the user's actions and thoughts related to their job and career development, as highlighted in the journal. 
-                    Keep your summary concise and focused on professional growth, ensuring it does not exceed 300 words.
-                    </instructions>
-                    
-                    <user_summary>
-                    {user_summary}
-                    </user_summary>
-
-                    <journal_summary>
-                    {journal_summary}
-                    </journal_summary>
-
-                    """
+                    self.prompts.user_profile_system_prompt
                 ),
                 # add for anthropic
                 MessagesPlaceholder(variable_name="messages"),
@@ -251,7 +247,7 @@ class UserProfile():
                 "journal_summary": journal_summary,
                 # add for anthropic
                 "messages": [
-                    HumanMessage(content="Make the updated user's profile based on the user summary and journal summary.")
+                    HumanMessage(content=self.prompts.user_profile_user_prompt)
                 ],
             }
             ).content
@@ -371,7 +367,7 @@ class AnthropicTokenCounter(BaseCallbackHandler):
 
 
 class RetrievalDocumentChainMemory(UserSessionStoreHistory):
-    def __init__(self, llm: Any, time_retriever: Any, user_profile: str, user_id: str, session_id: str, store_history: Dict, user_starting_date: str, buffer_num_ongo_messages: int) -> None:
+    def __init__(self, llm: Any, time_retriever: Any, user_profile: str, user_id: str, session_id: str, store_history: Dict, user_starting_date: str, buffer_num_ongo_messages: int, prompts: Any) -> None:
         super().__init__(user_id, session_id, user_starting_date)
         self.time_retriever = time_retriever
         self.user_profile = user_profile
@@ -381,6 +377,7 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
         self.retrieval_document_chain_with_message_history = None
         self.llm = llm
         self.buffer_num_ongo_messages = buffer_num_ongo_messages
+        self.prompts = prompts
 
     def parse_retriever_input(self, params: Dict) -> str:
         # return input from user
@@ -391,58 +388,14 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
         coach_chatbot_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system",
-                """
-                <instructions>
-                You are a friend of the user and expert in career coaching. You speak with a cool tone making short sentences. Stay focus on both the job search and the user’s psychological well-being. Proactively ask questions to explore his concerns, emotional states and personal motivations. Offer feedback based on its input, career aspirations, and emotional needs, and guide them if he seems off-track. You do not speak too much and if details are needed, you prioritize them and talk about the most important first. Refer to the following information in your responses:
-                - Today's date
-                - Updated user profile
-                - RAG Context
-                - Previous chat history
-                </instructions>
-
-                <example>
-                -user: I'm feeling overwhelmed by my job search.
-                -bot: It's normal to feel overwhelmed. Let's break it down. What's the most challenging part for you right now?
-                </example>
-
-                <example>
-                -user: I'm tired of looking for a job.
-                -bot: "what are you saying here my friend? Wake you up and let's go to work! Shine for me!!
-                </example>
-
-                <example>
-                -user: Can you detailed this.
-                -bot: Yes sure let s start with the most important point then move to the other details if you want.
-                </example>
-                """
+                self.prompts.system_prompt_coach
                 ),
 
                 MessagesPlaceholder("chat_history"),
 
                 ("human", 
-                
-                """
-                <instructions>
-                With the following information, you anwer to my questions as user input as friend and career coach.
-                </instructions>
-
-                <date_today>
-                {date_today}
-                </date_today>
-
-                <user_profile>
-                {user_profile}
-                </user_profile>
-
-                <rag_context>
-                {context}
-                </rag_context>
-
-                <user_input>
-                {input}
-                </user_input>
-
-                """),
+                self.prompts.user_prompt_coach
+                ),
             ]
             )
 
@@ -486,11 +439,7 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
                     MessagesPlaceholder(variable_name="chat_history"),
                     (
                         "user",
-                        """
-                        <instructions>
-                        Distill the above chat messages into a single summary message. Include as many specific details as you can. Mkae short sentence for using maximum 300 words.
-                        </instructions>
-                        """,
+                        self.prompts.ongo_summary_user_prompt,
                     )
                 ]
             )
@@ -552,11 +501,12 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
 
 
 class NewJournal():
-    def __init__(self, llm: Any, user_id: str, session_id: str, store_history: Dict) -> None:
+    def __init__(self, llm: Any, user_id: str, session_id: str, store_history: Dict, prompts: Any) -> None:
         self.llm = llm
         self.store_history = store_history
         self.user_id = user_id
         self.session_id = session_id
+        self.prompts = prompts
         self.new_journal = None
 
     def get_new_journal(self) -> None:
@@ -569,15 +519,7 @@ class NewJournal():
                 MessagesPlaceholder(variable_name="chat_history"),
                 (
                     "user",
-                    """
-                    <instructions>
-                    You are summarizer assitant focusing on job and career actions and thoughts of the user.
-
-                    Summarize the user's chat history based on career concerns to create a new personal journal observation about the user. 
-
-                    Do NOT exceed 300 words.
-                    </instructions>
-                    """,
+                    self.prompts.full_chat_to_journal_user_prompt,
                 ),
             ]
         )

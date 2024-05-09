@@ -22,6 +22,10 @@ def main():
     k = int(k)
     buffer_num_ongo_messages = input('buffer num ongoing messages (even integer): ')#10
     buffer_num_ongo_messages = int(buffer_num_ongo_messages)
+    coach = input('select your coach [career, love, health, finance, general] - pick only career: ')#
+
+    # select prompt
+    prompts = SelectPrompt('prompt_librairy.json', coach)
 
     # user definition - existance verification needed
     user_starting_date = "2024-04-10 16:30:20.856632"
@@ -83,7 +87,7 @@ def main():
     print()
 
     # user profile
-    user_profile = UserProfile(llm, formulaire_docs, journal_docs)
+    user_profile = UserProfile(llm, formulaire_docs, journal_docs, prompts)
     user_profile.user_profile_generation()
     user_profile = user_profile.user_profile
     print('User Profile')
@@ -108,7 +112,8 @@ def main():
         session_id, 
         store_history, 
         user_starting_date, 
-        buffer_num_ongo_messages=buffer_num_ongo_messages)
+        buffer_num_ongo_messages, 
+        prompts)
     retrieval_document_chain_memory.get_document_chain()
     retrieval_document_chain_memory.get_document_chain_with_message_history()
     retrieval_document_chain_memory.get_retrieval_document_chain_with_message_history()
@@ -122,7 +127,7 @@ def main():
         promt = input("You: ")
         if promt.lower() == 'exit':
             # get new journal for full messages
-            new_journal = NewJournal(llm, user_id, session_id, store_history)
+            new_journal = NewJournal(llm, user_id, session_id, store_history, prompts)
             new_journal.get_new_journal()
             new_journal = new_journal.new_journal
             print(f"new journal: {new_journal}")
