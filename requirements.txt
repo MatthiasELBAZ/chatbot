@@ -14,4 +14,4 @@ transformers==4.27.4
 tokenizers==0.13.3
 langchain-anthropic==0.1.11
 langchain-mistralai==0.1.6
-angchainhub==0.1.15
+langchainhub==0.1.15
