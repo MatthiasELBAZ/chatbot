@@ -8,6 +8,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_community.document_loaders.directory import DirectoryLoader
 from langchain_community.vectorstores import FAISS
+from langchain_chroma import Chroma
 from langchain_community.docstore import InMemoryDocstore
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -20,20 +21,20 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_anthropic import ChatAnthropic
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
+from pinecone import Pinecone, ServerlessSpec
 import faiss
 import datetime
 import pandas as pd
 import re
 import pprint
-import streamlit as st
-import datetime
 from pathlib import Path
 import tempfile
 import os
 import json
 from typing import Dict, Any
-from dotenv import load_dotenv
-load_dotenv()
+from pinecone import Pinecone, ServerlessSpec
+
+
 
 # utility functions
 def get_today():
@@ -124,12 +125,14 @@ class UserDirectoryLoader():
             else:
                 # edge case for formulaire - date the formulaire with the user starting date
                 metadata["created_at"] = datetime.datetime.strptime(user_starting_date, '%Y-%m-%d %H:%M:%S.%f')
+                
         return docs
 
     def load_csv_from_directory(self, csv_file_name: str, user_starting_date: str) -> list:
         loader = DirectoryLoader(self.directory, glob=csv_file_name, loader_cls=CSVLoader)
         docs = loader.load()
-        docs = self.add_date_to_documents(docs, user_starting_date)    
+        if user_starting_date:
+            docs = self.add_date_to_documents(docs, user_starting_date)   
         return docs
 
 
@@ -147,6 +150,8 @@ class LoadModels():
             llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=self.temperature, max_tokens=self.max_tokens, openai_api_key=self.llm_api_key)
         if self.llm_name_model == "openai_4":
             llm = ChatOpenAI(model="gpt-4-turbo", temperature=self.temperature, max_tokens=self.max_tokens, openai_api_key=self.llm_api_key)
+        if self.llm_name_model == "openai_4o":
+            llm = ChatOpenAI(model="gpt-4o", temperature=self.temperature, max_tokens=self.max_tokens, openai_api_key=self.llm_api_key)
         if self.llm_name_model == "anthropic_opus":
             llm = ChatAnthropic(model='claude-3-opus-20240229', temperature=self.temperature, max_tokens=self.max_tokens, anthropic_api_key=self.llm_api_key)
         if self.llm_name_model == "anthropic_sonnet":
@@ -158,9 +163,9 @@ class LoadModels():
         return llm
 
     def select_embedding_model(self) -> Any:
-        if self.embedding_name_model == "openai_3.5" or self.embedding_name_model == "openai_4":
+        if self.embedding_name_model == "openai":
             embedding = OpenAIEmbeddings(openai_api_key=self.embedding_api_key)
-        if self.embedding_name_model == "mistral_large" or self.embedding_name_model == "mistral_8x22B":
+        if self.embedding_name_model == "mistralai":
             embedding = MistralAIEmbeddings(api_key=self.embedding_api_key)
         return embedding
 
@@ -280,7 +285,7 @@ class TimeWeightedRetriever():
         self.decay_rate = decay_rate
         self.k = k
 
-    def get_vectorstore(self, index=None) -> None:
+    def get_vectorstore(self, index=None, namespace=None) -> None:
         if self.type == "faiss":
             # declare index
             index = faiss.IndexFlatL2(1536)
@@ -289,7 +294,7 @@ class TimeWeightedRetriever():
             vectorstore = FAISS(self.embedding, index, InMemoryDocstore({}), {})
         if self.type == "pinecone":
             # make vectorstore
-            vectorstore = PineconeVectorStore(index_name=index, embedding=self.embedding)
+            vectorstore = PineconeVectorStore(index_name=index, embedding=self.embedding, namespace=namespace, pinecone_api_key=os.environ.get("PINECONE_API_KEY"))
 
         # assign vectorstore to self
         self.vectorstore = vectorstore
@@ -318,7 +323,86 @@ class TimeWeightedRetriever():
             self.time_retriever.add_documents([Document(page_content=page_content, metadata=metadata)])
 
 
-class AnthropicTokenCounter(BaseCallbackHandler):
+class PineconeTimeWeightedRetriever():
+    def __init__(self, embedding: Any, decay_rate: float, k: int) -> None:
+        self.embedding = embedding
+        self.decay_rate = decay_rate
+        self.k = k
+        self.vectorstore = None
+        self.time_retriever = None
+        self.pinecone_index = None
+        
+    def get_vectorstore(self, index_name, namespace) -> None:
+        # declare vectore store
+        vectorstore = PineconeVectorStore(
+            index_name=index_name, 
+            embedding=self.embedding, 
+            namespace=namespace, 
+            pinecone_api_key=os.environ.get("PINECONE_API_KEY")
+            )
+
+        # assign vectorstore to self
+        self.vectorstore = vectorstore
+        
+    def get_time_retriever(self) -> None:
+        time_retriever = Pinecone_Modified_TimeWeightedVectorStoreRetriever(
+            vectorstore=self.vectorstore, 
+            decay_rate=self.decay_rate, 
+            k=self.k
+            )
+
+        # assign time retriever to self
+        self.time_retriever = time_retriever
+
+    def time_retriever_add_from_index(self, namespace: list) -> None:
+        memory_stream = []
+        for id in list(self.pinecone_index.list(namespace=namespace))[0]:
+            fetch_doc = self.pinecone_index.fetch(ids=[id], namespace=namespace)
+            doc = self.pinecone_index.fetch([id],namespace=namespace)
+            page_content = doc['vectors'][id]['metadata']['text']
+            metadata = doc['vectors'][id]['metadata']
+            metadata['created_at'] = datetime.datetime.strptime(metadata['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
+            metadata['last_accessed_at'] = datetime.datetime.strptime(metadata['last_accessed_at'], '%Y-%m-%dT%H:%M:%S.%f')
+            metadata['buffer_idx'] = int(metadata['buffer_idx'])
+            metadata.pop('text', None)
+            memory_stream.append(Document(page_content=page_content, metadata=metadata))
+        self.time_retriever.memory_stream = memory_stream
+
+    def time_retriever_add_from_documents(self, docs: list) -> None:
+        for i, doc in enumerate(docs):
+            page_content = doc.page_content
+            metadata = doc.metadata
+            self.time_retriever.add_documents([Document(page_content=page_content, metadata=metadata)])
+
+    def get_pinecone_index(self, index_name) -> None:
+        pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
+        self.pinecone_index = pc.Index(index_name)
+
+    def print_index_stats(self) -> Any:
+        return self.pinecone_index.describe_index_stats()
+
+    def delete_namespace(self, namespace) -> None:
+        self.pinecone_index.delete(namespace=namespace,  delete_all=True)
+
+
+class ChromaFormulaireRtriever():
+    def __init__(self, formulaire_docs_intemp: list) -> None:
+        self.formulaire_docs_intemp = formulaire_docs_intemp
+        self.formulaire_vectorstore = None
+        self.formulaire_retriever = None
+    
+    def format_docs(self, docs: list) -> str:
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    def get_formulaire_vectorstore(self) -> None:
+        self.formulaire_vectorstore = Chroma.from_documents(documents=self.formulaire_docs_intemp, embedding=OpenAIEmbeddings())
+    
+    def get_formulaire_retriever(self) -> None:
+        self.formulaire_retriever = self.formulaire_vectorstore.as_retriever()
+        self.formulaire_retriever = self.formulaire_retriever | self.format_docs
+
+
+class CallBacker(BaseCallbackHandler):
     def __init__(self, llm):
         self.llm = llm
         # get model name
@@ -356,21 +440,24 @@ class AnthropicTokenCounter(BaseCallbackHandler):
 
     def on_llm_start(self, serialized, prompts, **kwargs):
         for p in prompts:
-            self.input_tokens += self.llm.get_num_tokens(p)
+            # self.input_tokens += self.llm.get_num_tokens(p)
+            self.input_tokens += len(p.split(' '))
 
     def on_llm_end(self, response, **kwargs):
         results = response.flatten()
         for r in results:
-            self.output_tokens = self.llm.get_num_tokens(r.generations[0][0].text)
+            # self.output_tokens = self.llm.get_num_tokens(r.generations[0][0].text)
+            self.output_tokens = len(r.generations[0][0].text.split(' '))
 
     def get_request_price(self):
         return self.input_tokens*self.price_input + self.output_tokens*self.price_output 
 
 
 class RetrievalDocumentChainMemory(UserSessionStoreHistory):
-    def __init__(self, llm: Any, time_retriever: Any, user_profile: str, user_id: str, session_id: str, store_history: Dict, user_starting_date: str, buffer_num_ongo_messages: int, prompts: Any) -> None:
+    def __init__(self, llm: Any, time_retriever: Any, formulaire_retriever: Any, user_profile: str, user_id: str, session_id: str, store_history: Dict, user_starting_date: str, buffer_num_ongo_messages: int, prompts: Any) -> None:
         super().__init__(user_id, session_id, user_starting_date)
         self.time_retriever = time_retriever
+        self.formulaire_retriever = formulaire_retriever
         self.user_profile = user_profile
         self.store_history = store_history
         self.document_chain = None
@@ -382,6 +469,7 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
 
     def parse_retriever_input(self, params: Dict) -> str:
         # return input from user
+        print(params)
         return params["input"]
     
     def get_document_chain(self) -> None:
@@ -468,8 +556,7 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
     def get_retrieval_document_chain_with_message_history(self) -> None:
         retrieval_document_chain_with_message_history = (
             RunnablePassthrough.assign(
-                messages_summarized=self.summarize_ongo_messages, 
-                context=self.parse_retriever_input | self.time_retriever).assign(
+                messages_summarized=self.summarize_ongo_messages).assign(
                     answer=self.document_chain_with_message_history)
         )
 
@@ -478,13 +565,15 @@ class RetrievalDocumentChainMemory(UserSessionStoreHistory):
 
     def run_chat(self, input: str) -> [Dict, Any]:
         # get callbacker
-        callbacker = AnthropicTokenCounter(self.llm)
+        callbacker = CallBacker(self.llm)
 
         # run chat with callback
         result = self.retrieval_document_chain_with_message_history.invoke(
             {
                 'date_today': get_today(),
                 'user_profile': self.user_profile,
+                "context": (self.time_retriever).invoke(input),
+                "rag_user_info_context": self.formulaire_retriever.invoke(input),
                 "input":input
             },
             config={
@@ -555,7 +644,7 @@ class UpdateStore():
         df.to_csv(self.journal_csv_path, index=False)
 
     def update_store_chat_history(self) -> None:
-        # new chat history
+         # new chat history
         new_df_chat_history = pd.DataFrame(self.store_history[self.user_id][self.session_id]['full'].dict()['messages'])
         new_df_chat_history['date'] = get_today()
         new_df_chat_history = new_df_chat_history[['date', 'content', 'type']]
