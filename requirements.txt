@@ -1,6 +1,5 @@
 pandas
 datetime
-faiss-cpu
 langchain==0.1.19
 langchain-anthropic==0.1.11
 langchain-chroma==0.1.0
@@ -13,4 +12,4 @@ langchain-pinecone==0.1.0
 langchain-text-splitters==0.0.1
 langchainhub==0.1.15
 transformers==4.27.4
-tokenizers==0.13.3
+tokenizers==0.15.2
