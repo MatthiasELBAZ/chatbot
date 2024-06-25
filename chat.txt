@@ -1,0 +1,10 @@
+http://localhost:5001/chat Fonction de chat appel via API
+
+
+POSTMAN en mode RAW methode POST
+
+{
+    "user_id": "1",
+    "session_id": "18",
+    "new_prompt": "Hello comment vas tu ?"
+}

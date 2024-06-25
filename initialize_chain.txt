@@ -1,0 +1,14 @@
+http://localhost:5001/initialize_chain Fonction d'initialisation de l'objet
+
+Est ce que cette methode sert réellement encore ????
+
+POSTMAN en mode RAW methode POST
+
+
+{
+    "user_id": "24",
+    "session_id": "1",
+    "instructions": {
+        "llm": "gpt_4o"
+    }
+}
