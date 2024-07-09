@@ -144,7 +144,7 @@ class LoadModels():
             api_key = os.getenv("OPENAI_API_KEY")
         if 'claude' in llm_name_model:
             api_key = os.getenv("ANTHROPIC_API_KEY")
-        if 'mistral' or 'mixtral' in llm_name_model:
+        if ('mistral' or 'mixtral') in llm_name_model:
             api_key = os.getenv("MISTRALAI_API_KEY")
         
         if not api_key:
@@ -158,7 +158,7 @@ class LoadModels():
             llm = ChatOpenAI(model=llm_name_model, temperature=self.temperature, max_tokens=self.max_tokens, openai_api_key=api_key)
         if 'claude' in llm_name_model:
             llm = ChatAnthropic(model=llm_name_model, temperature=self.temperature, max_tokens=self.max_tokens, anthropic_api_key=api_key)
-        if 'mistral' in llm_name_model:
+        if ('mistral' or 'mixtral') in llm_name_model:
             llm = ChatMistralAI(model=llm_name_model, temperature=self.temperature, max_tokens=self.max_tokens, mistral_api_key=api_key)
         return llm
 
@@ -169,7 +169,7 @@ class LoadModels():
             embedding = OpenAIEmbeddings(openai_api_key=api_key)
         if 'claude' in llm_name_model:
             embedding = OpenAIEmbeddings(openai_api_key=api_key)
-        if 'mistral' in llm_name_model:
+        if ('mistral' or 'mixtral') in llm_name_model:
             embedding = OpenAIEmbeddings(api_key=api_key)
 
         return embedding
@@ -728,7 +728,7 @@ def update_and_store_after_exit(initialization_dict):
     return initialization_dict
 
 
-def run_chat(input, initialization_dict, modify_llm_name_model=None):
+def run_chat(input, initialization_dict, modify_llm_name_model):
 
     logging.debug("#########################")
     logging.debug(f"{input}")
@@ -772,7 +772,8 @@ def run_chat(input, initialization_dict, modify_llm_name_model=None):
     # if modify_llm_name_model is not None then modify the llm model and all necessary object depending on the new model
     if modify_llm_name_model!=llm_name_model:
         Load_Models = LoadModels(modify_llm_name_model, temperature)
-        llm_api_key = Load_Models.select_api_key()
+        logging.debug("##########LoadModel###############")
+        logging.debug(f"{Load_Models.llm_name_model}")
         logging.debug("##########LLMAPIKEY###############")
         logging.debug(f"{llm_api_key}")
         llm = Load_Models.select_llm_model(llm_api_key)
@@ -783,8 +784,12 @@ def run_chat(input, initialization_dict, modify_llm_name_model=None):
         initialization_dict['llm'] = llm
         initialization_dict['embedding'] = embedding
 
+        llm_name_model = modify_llm_name_model
+
+
         # update the llm in the Retrieval_Document_Chain_Memory
         Retrieval_Document_Chain_Memory.get_retrieval_document_chain_with_message_history(llm, prompts, user_id, session_id, store_history, buffer_num_ongo_messages)
+    
 
     # run chat
     if input.lower() == 'exit':
