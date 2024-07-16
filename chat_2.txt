@@ -1,0 +1,6 @@
+{
+    "user_id": "1",
+    "session_id": "1",
+    "new_prompt": "Hello comment vas tu ?",
+    "llm_name_model": "mistral-large-latest"
+}

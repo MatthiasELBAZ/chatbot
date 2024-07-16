@@ -174,7 +174,7 @@ def chat():
         logging.debug(f" information ICI {new_prompt}")
 
 
-        if not all([user_id, session_id, new_prompt]):
+        if not all([user_id, session_id, new_prompt, llm_name_model]):
             return jsonify({"status": "Error", "message": "user_id, session_id, and new_prompt are required."}), 400
 
         session = sessions.get((user_id, session_id))
