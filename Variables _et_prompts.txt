@@ -1,0 +1,19 @@
+Explication des variables du model et des prompts:
+
+decay_rate change la capacite de la memoire sur le journal - compris entre 0 et 1 - 0 = memoire d elephant, 1 = memoire de poisson rouge - conseils garde une valeur proche de zero
+temperature change la creativite du LLM - compris entre 0 et 1 - garde une valeur proche de 0
+k le nombre de souvenirs recuperes dans le journal - un nombre entier mais garde le autour de 3
+buffer_num_ongo_messages est le nombre de messages maximal qui restent dans le prompt en memoire buffer, lorsque se nombre est atteint, au fait un resume de la conversation et on vide la memoire du buffer.
+
+system_prompt_coach = le prompt qui definit le coach - sa personalite, les regles qu il doit respecter et des examples de reponses attendues
+user_prompt_coach = l input du user mais elle peux etre augmenter avec des instructions supplementaires 
+
+journal_user_summary_system_prompt = explique au llm comment faire un user profile initial avec du context venant du journal
+journal_summary_user_prompt = dit au llm de faire le resume via le journal
+user_summary_user_prompt = dit au llm de faire le resume via le formulaire
+
+user_profile_system_prompt = explique au llm comment faire un user profile updated avec du context venant du journal et user profile initial
+user_profile_user_prompt = dit au llm de faire l update
+
+ongo_summary_user_prompt = dit au llm de faire un resume de la conversation dans le buffer
+full_chat_to_journal_user_prompt = dit au llm comment et de faire le resume de la conversation de toute la conversation de la session
